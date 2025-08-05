@@ -8,7 +8,13 @@ agents:
             - str_replace_based_edit_tool
             - sequentialthinking
             - task_done
-
+allow_mcp_servers:
+    - playwright
+mcp_servers:
+    playwright:
+        command: npx
+        args:
+            - "@playwright/mcp@0.0.27"
 lakeview:
     model: lakeview_model
 

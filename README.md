@@ -67,6 +67,25 @@ We recommend to configure Trae Agent using the config file.
    - Add additional model providers as needed (OpenAI, Google, Azure, etc.)
    - Configure your preferred models and settings
 
+3. **(Optional) Add mcp_servers section to enable agent to call MCP services:**
+   You can configure MCP services by adding an mcp_servers section in trae_config.json.
+   Here's an example configuration for integrating Playwright MCP:
+
+   ``` json
+      {
+         "default_provider": "anthropic",
+         "max_steps": 20,
+         "enable_lakeview": true,
+         "mcp_servers": {
+            "playwright": {
+               "command": "npx",
+               "args": [
+               "@playwright/mcp@0.0.27"
+               ]
+            }
+         }
+      }
+   ```
 **Note:** The `trae_config.yaml` file is ignored by git to prevent accidentally committing your API keys.
 
 **Legacy JSON Configuration:** If you're using the older JSON configuration format, please refer to [docs/legacy_config.md](docs/legacy_config.md) for instructions. We recommend migrating to the new YAML format.

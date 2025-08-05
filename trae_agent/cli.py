@@ -9,7 +9,7 @@ import sys
 import traceback
 from pathlib import Path
 
-import click
+import asyncclick as click
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
@@ -25,7 +25,7 @@ _ = load_dotenv()
 console = Console()
 
 
-def create_agent(trae_agent_config: TraeAgentConfig) -> TraeAgent:
+async def create_agent(trae_agent_config: TraeAgentConfig) -> TraeAgent:
     """
     create_agent creates a Trae Agent with the specified configuration.
     Args:
@@ -35,7 +35,8 @@ def create_agent(trae_agent_config: TraeAgentConfig) -> TraeAgent:
     """
     try:
         # Create agent
-        agent = TraeAgent(trae_agent_config)
+        # agent = TraeAgent(trae_agent_config)
+        agent = await TraeAgent.create(trae_agent_config)
         return agent
 
     except Exception as e:
@@ -69,7 +70,7 @@ def cli():
 )
 @click.option("--trajectory-file", "-t", help="Path to save trajectory file")
 @click.option("--patch-path", "-pp", help="Path to patch file")
-def run(
+async def run(
     task: str | None,
     file_path: str | None,
     patch_path: str,
@@ -124,7 +125,7 @@ def run(
     trae_agent_config = config.trae_agent
     # Create agent
     if trae_agent_config:
-        agent: TraeAgent = create_agent(trae_agent_config)
+        agent: TraeAgent = await create_agent(trae_agent_config)
     else:
         console.print("[red]Error: trae_agent configuration is required in the config file.[/red]")
         sys.exit(1)
@@ -175,7 +176,8 @@ def run(
             "patch_path": patch_path,
         }
         agent.new_task(task, task_args)
-        _ = asyncio.run(agent.execute_task())
+        # _ = asyncio.run(agent.execute_task())
+        await agent.execute_task()
 
         console.print(f"\n[green]Trajectory saved to: {trajectory_path}[/green]")
 
@@ -205,7 +207,7 @@ def run(
 )
 @click.option("--max-steps", help="Maximum number of execution steps", type=int, default=20)
 @click.option("--trajectory-file", "-t", help="Path to save trajectory file")
-def interactive(
+async def interactive(
     provider: str | None = None,
     model: str | None = None,
     model_base_url: str | None = None,
@@ -248,7 +250,7 @@ def interactive(
     )
 
     # Create agent
-    agent = create_agent(trae_agent_config)
+    agent = await create_agent(trae_agent_config)
 
     while True:
         try:
@@ -431,7 +433,7 @@ def tools():
 
 def main():
     """Main entry point for the CLI."""
-    cli()
+    asyncio.run(cli())
 
 
 if __name__ == "__main__":

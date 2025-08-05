@@ -99,11 +99,39 @@ class ModelConfig:
 
 
 @dataclass
+class MCPServerConfig:
+    # For stdio transport
+    command: str | None = None
+    args: list[str] | None = None
+    env: dict[str, str] | None = None
+    cwd: str | None = None
+
+    # For sse transport
+    url: str | None = None
+
+    # For streamable http transport
+    http_url: str | None = None
+    headers: dict[str, str] | None = None
+
+    # For websocket transport
+    tcp: str | None = None
+
+    # Common
+    timeout: int | None = None
+    trust: bool | None = None
+
+    # Metadata
+    description: str | None = None
+
+
+@dataclass
 class AgentConfig:
     """
     Base class for agent configurations.
     """
 
+    allow_mcp_servers: list[str]
+    mcp_servers_config: dict[str, MCPServerConfig]
     max_steps: int
     model: ModelConfig
     tools: list[str]
@@ -220,6 +248,11 @@ class Config:
         else:
             config.lakeview = None
 
+        mcp_servers_config = {
+            k: MCPServerConfig(**v) for k, v in yaml_config.get("mcp_servers", {}).items()
+        }
+        allow_mcp_servers = yaml_config.get("allow_mcp_servers", [])
+
         # Parse agents
         agents = yaml_config.get("agents", None)
         if agents is not None and len(agents.keys()) > 0:
@@ -233,7 +266,11 @@ class Config:
                     raise ConfigError(f"Model {agent_model_name} not found") from e
                 match agent_name:
                     case "trae_agent":
-                        trae_agent_config = TraeAgentConfig(**agent_config)
+                        trae_agent_config = TraeAgentConfig(
+                            **agent_config,
+                            mcp_servers_config=mcp_servers_config,
+                            allow_mcp_servers=allow_mcp_servers,
+                        )
                         trae_agent_config.model = agent_model
                         if trae_agent_config.enable_lakeview and config.lakeview is None:
                             raise ConfigError("Lakeview is enabled but no lakeview config provided")
@@ -307,11 +344,15 @@ class Config:
                 legacy_config.default_provider
             ].stop_sequences,
         )
-
+        mcp_servers_config = {
+            k: MCPServerConfig(**vars(v)) for k, v in legacy_config.mcp_servers.items()
+        }
         trae_agent_config = TraeAgentConfig(
             max_steps=legacy_config.max_steps,
             enable_lakeview=legacy_config.enable_lakeview,
             model=model_config,
+            allow_mcp_servers=legacy_config.allow_mcp_servers,
+            mcp_servers_config=mcp_servers_config,
         )
 
         if trae_agent_config.enable_lakeview:

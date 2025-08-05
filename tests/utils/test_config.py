@@ -165,6 +165,32 @@ class TestLakeviewConfig(unittest.TestCase):
             },
         }
 
+    def get_config_with_mcp_servers(self):
+        return {
+            "default_provider": "anthropic",
+            "enable_lakeview": True,
+            "model_providers": {
+                "anthropic": {
+                    "api_key": "anthropic-key",
+                    "model": "claude-model",
+                    "max_tokens": 4096,
+                    "temperature": 0.5,
+                    "top_p": 1,
+                    "top_k": 0,
+                    "max_retries": 10,
+                },
+                "doubao": {
+                    "api_key": "doubao-key",
+                    "model": "doubao-model",
+                    "max_tokens": 8192,
+                    "temperature": 0.5,
+                    "top_p": 1,
+                    "max_retries": 20,
+                },
+            },
+            "mcp_servers": {"test_server": {"command": "echo", "args": [], "env": {}, "cwd": "."}},
+        }
+
     def test_lakeview_defaults_to_main_provider(self):
         config_data = self.get_base_config()
 
@@ -189,6 +215,21 @@ class TestLakeviewConfig(unittest.TestCase):
 
         config = Config.create_from_legacy_config(legacy_config=LegacyConfig(config_data))
         self.assertIsNone(config.lakeview)
+
+    def test_mcp_servers_config(self):
+        config_data = self.get_config_with_mcp_servers()
+        config = Config.create_from_legacy_config(legacy_config=LegacyConfig(config_data))
+        self.assertIn("test_server", config.trae_agent.mcp_servers_config)
+        self.assertEqual(config.trae_agent.mcp_servers_config["test_server"].command, "echo")
+        self.assertEqual(config.trae_agent.mcp_servers_config["test_server"].args, [])
+        self.assertEqual(config.trae_agent.mcp_servers_config["test_server"].env, {})
+        self.assertEqual(config.trae_agent.mcp_servers_config["test_server"].cwd, ".")
+
+    def test_mcp_servers_empty_config(self):
+        config_data = self.get_base_config()
+        config = Config.create_from_legacy_config(legacy_config=LegacyConfig(config_data))
+
+        self.assertEqual(config.trae_agent.mcp_servers_config, {})
 
 
 if __name__ == "__main__":

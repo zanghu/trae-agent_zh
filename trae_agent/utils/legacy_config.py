@@ -9,7 +9,7 @@
 # pyright: reportUnknownVariableType=false
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, override
 
@@ -42,14 +42,42 @@ class LakeviewConfig:
 
 
 @dataclass
+class MCPServerConfig:
+    # For stdio transport
+    command: str | None = None
+    args: list[str] | None = None
+    env: dict[str, str] | None = None
+    cwd: str | None = None
+
+    # For sse transport
+    url: str | None = None
+
+    # For streamable http transport
+    http_url: str | None = None
+    headers: dict[str, str] | None = None
+
+    # For websocket transport
+    tcp: str | None = None
+
+    # Common
+    timeout: int | None = None
+    trust: bool | None = None
+
+    # Metadata
+    description: str | None = None
+
+
+@dataclass
 class LegacyConfig:
     """Configuration manager for Trae Agent."""
 
     default_provider: str
     max_steps: int
     model_providers: dict[str, ModelParameters]
+    mcp_servers: dict[str, MCPServerConfig]
     lakeview_config: LakeviewConfig | None = None
     enable_lakeview: bool = True
+    allow_mcp_servers: list[str] = field(default_factory=list)
 
     def __init__(self, config_or_config_file: str | dict = "trae_config.json"):  # pyright: ignore[reportMissingTypeArgument, reportUnknownParameterType]
         # Accept either file path or direct config dict
@@ -71,6 +99,10 @@ class LegacyConfig:
         self.max_steps = self._config.get("max_steps", 20)
         self.model_providers = {}
         self.enable_lakeview = self._config.get("enable_lakeview", True)
+        self.mcp_servers = {
+            k: MCPServerConfig(**v) for k, v in self._config.get("mcp_servers", {}).items()
+        }
+        self.allow_mcp_servers = self._config.get("allow_mcp_servers", [])
 
         if len(self._config.get("model_providers", [])) == 0:
             self.model_providers = {
