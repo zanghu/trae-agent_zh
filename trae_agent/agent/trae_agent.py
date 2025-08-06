@@ -3,6 +3,8 @@
 
 """TraeAgent for software engineering tasks."""
 
+import asyncio
+import contextlib
 import os
 import subprocess
 from typing import override
@@ -12,8 +14,9 @@ from trae_agent.agent.base_agent import BaseAgent
 from trae_agent.prompt.agent_prompt import TRAE_AGENT_SYSTEM_PROMPT
 from trae_agent.tools import tools_registry
 from trae_agent.tools.base import Tool, ToolExecutor, ToolResult
-from trae_agent.utils.config import TraeAgentConfig
+from trae_agent.utils.config import MCPServerConfig, TraeAgentConfig
 from trae_agent.utils.llm_clients.llm_basics import LLMMessage, LLMResponse
+from trae_agent.utils.mcp_client import MCPClient
 
 TraeAgentToolNames = [
     "str_replace_based_edit_tool",
@@ -40,7 +43,22 @@ class TraeAgent(BaseAgent):
         self.base_commit: str | None = None
         self.must_patch: str = "false"
         self.patch_path: str | None = None
+        self.mcp_servers_config: dict[str, MCPServerConfig] | None = (
+            trae_agent_config.mcp_servers_config if trae_agent_config.mcp_servers_config else None
+        )
+        self.allow_mcp_servers: list[str] | None = (
+            trae_agent_config.allow_mcp_servers if trae_agent_config.allow_mcp_servers else []
+        )
+        self.mcp_tools: list[Tool] = []
+        self.mcp_clients: list[MCPClient] = []  # Keep track of MCP clients for cleanup
         super().__init__(agent_config=trae_agent_config)
+
+    async def initialise_mcp(self):
+        """Async factory to create and initialize TraeAgent."""
+        await self.discover_mcp_tools()
+
+        if self.mcp_tools:
+            self._tools.extend(self.mcp_tools)
 
     def setup_trajectory_recording(self, trajectory_path: str | None = None) -> str:
         """Set up trajectory recording for this agent.
@@ -57,6 +75,36 @@ class TraeAgent(BaseAgent):
         self.set_trajectory_recorder(recorder)
 
         return recorder.get_trajectory_path()
+
+    async def discover_mcp_tools(self):
+        if self.mcp_servers_config:
+            for mcp_server_name, mcp_server_config in self.mcp_servers_config.items():
+                if self.allow_mcp_servers is None:
+                    return
+                if mcp_server_name not in self.allow_mcp_servers:
+                    continue
+                mcp_client = MCPClient()
+                try:
+                    await mcp_client.connect_and_discover(
+                        mcp_server_name,
+                        mcp_server_config,
+                        self.mcp_tools,
+                        self._llm_client.provider.value,
+                    )
+                    # Store client for later cleanup
+                    self.mcp_clients.append(mcp_client)
+                except Exception:
+                    # Clean up failed client
+                    with contextlib.suppress(Exception):
+                        await mcp_client.cleanup(mcp_server_name)
+                    continue
+                except asyncio.CancelledError:
+                    # If the task is cancelled, clean up and skip this server
+                    with contextlib.suppress(Exception):
+                        await mcp_client.cleanup(mcp_server_name)
+                    continue
+        else:
+            return
 
     @override
     def new_task(
@@ -203,3 +251,12 @@ class TraeAgent(BaseAgent):
     def task_incomplete_message(self) -> str:
         """Return a message indicating that the task is incomplete."""
         return "ERROR! Your Patch is empty. Please provide a patch that fixes the problem."
+
+    @override
+    async def cleanup_mcp_clients(self) -> None:
+        """Clean up all MCP clients to prevent async context leaks."""
+        for client in self.mcp_clients:
+            with contextlib.suppress(Exception):
+                # Use a generic server name for cleanup since we don't track which server each client is for
+                await client.cleanup("cleanup")
+        self.mcp_clients.clear()
