@@ -26,6 +26,28 @@ _ = load_dotenv()
 console = Console()
 
 
+def resolve_config_file(config_file: str) -> str:
+    """
+    Resolve config file with backward compatibility.
+    First tries the specified file, then falls back to JSON if YAML doesn't exist.
+    """
+    if config_file.endswith(".yaml") or config_file.endswith(".yml"):
+        yaml_path = Path(config_file)
+        json_path = Path(config_file.replace(".yaml", ".json").replace(".yml", ".json"))
+        if yaml_path.exists():
+            return str(yaml_path)
+        elif json_path.exists():
+            console.print(f"[yellow]YAML config not found, using JSON config: {json_path}[/yellow]")
+            return str(json_path)
+        else:
+            console.print(
+                "[red]Error: Config file not found. Please specify a valid config file in the command line option --config-file[/red]"
+            )
+            sys.exit(1)
+    else:
+        return config_file
+
+
 @click.group()
 @click.version_option(version="0.1.0")
 def cli():
@@ -46,7 +68,7 @@ def cli():
 @click.option(
     "--config-file",
     help="Path to configuration file",
-    default="trae_config.json",
+    default="trae_config.yaml",
     envvar="TRAE_CONFIG_FILE",
 )
 @click.option("--trajectory-file", "-t", help="Path to save trajectory file")
@@ -54,6 +76,7 @@ def cli():
 @click.option(
     "--console-type",
     "-ct",
+    default="simple",
     type=click.Choice(["simple", "rich"], case_sensitive=False),
     help="Type of console to use (simple or rich)",
 )
@@ -75,21 +98,24 @@ def run(
     max_steps: int | None = None,
     working_dir: str | None = None,
     must_patch: bool = False,
-    config_file: str = "trae_config.json",
+    config_file: str = "trae_config.yaml",
     trajectory_file: str | None = None,
     console_type: str | None = "simple",
     agent_type: str | None = "trae_agent",
 ):
     """
-    Run is the main function of tace. It runs a task using Trae Agent.
+    Run is the main function of tace. it runs a task using Trae Agent.
     Args:
         tasks: the task that you want your agent to solve. This is required to be in the input
         model: the model expected to be use
-        working_dir: the working directory of the agent. This should be set either in cli or inf the config file (trae_config.json)
+        working_dir: the working directory of the agent. This should be set either in cli or in the config file
 
     Return:
         None (it is expected to be ended after calling the run function)
     """
+
+    # Apply backward compatibility for config file
+    config_file = resolve_config_file(config_file)
 
     if file_path:
         if task:
@@ -208,7 +234,7 @@ def run(
 @click.option(
     "--config-file",
     help="Path to configuration file",
-    default="trae_config.json",
+    default="trae_config.yaml",
     envvar="TRAE_CONFIG_FILE",
 )
 @click.option("--max-steps", help="Maximum number of execution steps", type=int, default=20)
@@ -231,7 +257,7 @@ def interactive(
     model: str | None = None,
     model_base_url: str | None = None,
     api_key: str | None = None,
-    config_file: str = "trae_config.json",
+    config_file: str = "trae_config.yaml",
     max_steps: int | None = None,
     trajectory_file: str | None = None,
     console_type: str | None = "simple",
@@ -242,6 +268,9 @@ def interactive(
     Args:
         console_type: Type of console to use for the interactive session
     """
+    # Apply backward compatibility for config file
+    config_file = resolve_config_file(config_file)
+
     config = Config.create(
         config_file=config_file,
     ).resolve_config_values(
@@ -401,7 +430,7 @@ async def _run_rich_interactive_loop(
 @click.option(
     "--config-file",
     help="Path to configuration file",
-    default="trae_config.json",
+    default="trae_config.yaml",
     envvar="TRAE_CONFIG_FILE",
 )
 @click.option("--provider", "-p", help="LLM provider to use")
@@ -411,13 +440,16 @@ async def _run_rich_interactive_loop(
 @click.option("--max-steps", help="Maximum number of execution steps", type=int)
 def show_config(
     config_file: str,
-    provider: str | None = None,
-    model: str | None = None,
-    model_base_url: str | None = None,
-    api_key: str | None = None,
-    max_steps: int | None = None,
+    provider: str | None,
+    model: str | None,
+    model_base_url: str | None,
+    api_key: str | None,
+    max_steps: int | None,
 ):
     """Show current configuration settings."""
+    # Apply backward compatibility for config file
+    config_file = resolve_config_file(config_file)
+
     config_path = Path(config_file)
     if not config_path.exists():
         console.print(
