@@ -69,7 +69,7 @@ class _BashSession:
         if self._process.returncode is not None:
             return
         self._process.terminate()
-        
+
         # Wait until the process has truly terminated.
         stdout, stderr = await self._process.communicate()
 

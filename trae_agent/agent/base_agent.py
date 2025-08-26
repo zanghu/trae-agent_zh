@@ -155,11 +155,13 @@ class BaseAgent(ABC):
 
         self._update_cli_console(step, execution)
         return execution
-        
+
     async def _close_tools(self):
         """Release tool resources, mainly about BashTool object."""
         if self._tool_caller:
-            res = await self._tool_caller.close_tools() # Ensure all tool resources are properly released.
+            # Ensure all tool resources are properly released.
+            res = await self._tool_caller.close_tools()
+            return res
 
     async def _run_llm_step(
         self, step: "AgentStep", messages: list["LLMMessage"], execution: "AgentExecution"
