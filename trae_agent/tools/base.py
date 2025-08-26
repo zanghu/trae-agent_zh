@@ -173,6 +173,10 @@ class Tool(ABC):
             schema["additionalProperties"] = False
 
         return schema
+        
+    async def close(self):
+        """Ensure proper tool resource deallocation before task completion."""
+        pass
 
 
 class ToolExecutor:
@@ -181,6 +185,13 @@ class ToolExecutor:
     def __init__(self, tools: list[Tool]):
         self._tools = tools
         self._tool_map: dict[str, Tool] | None = None
+        
+    async def close_tools(self):
+        """Ensure all tool resources are properly released."""
+        #for tool in self._tools:
+        tasks = [tool.close() for tool in self._tools if hasattr(tool, "close")]
+        res = await asyncio.gather(*tasks)
+        return res
 
     def _normalize_name(self, name: str) -> str:
         """Normalize tool name by making it lowercase and removing underscores."""
