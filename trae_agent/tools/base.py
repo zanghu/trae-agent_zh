@@ -176,7 +176,7 @@ class Tool(ABC):
 
     async def close(self):
         """Ensure proper tool resource deallocation before task completion."""
-        return None # Using "pass" will trigger a Ruff check error: B027
+        return None  # Using "pass" will trigger a Ruff check error: B027
 
 
 class ToolExecutor:
