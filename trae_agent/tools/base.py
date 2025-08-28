@@ -176,7 +176,7 @@ class Tool(ABC):
 
     async def close(self):
         """Ensure proper tool resource deallocation before task completion."""
-        pass
+        return None
 
 
 class ToolExecutor:
